@@ -19,11 +19,12 @@
        Particle.function("setTotalMin", &EyeSaver::setTotalMin, this);
      }
 
-     const int ticksPerLed = 167;
+     const static int ticksPerLed = 167;
+
      bool isRunning = false;
      int currentLed = 0;
      bool isAlarming = false;
-     int totalMin = 30;
+     int totalMin = 1;
 
      int setTotalMin(String inputMin) {
        int parsedTotal = inputMin.toInt();
@@ -32,7 +33,7 @@
        }
      }
 
-     bool increment(InternetButton b) {
+     void increment(InternetButton b) {
        isRunning = true;
        currentLed++;
        if (currentLed == 12) {
@@ -41,7 +42,6 @@
        } else {
          b.smoothLedOn(currentLed, 0, 0, 20);
        }
-       return isRunning;
      }
 
      void stopAndReset(InternetButton b) {
@@ -61,8 +61,10 @@
  EyeSaver myEyeSaver;
  IntervalTimer myTimer;
  int tickCounter;
+ bool alarmTriggered;
 
  int pushButton(String cmd) {
+   Particle.publish("button-pushed", PRIVATE);
    if (myEyeSaver.isRunning || myEyeSaver.isAlarming) {
      myEyeSaver.stopAndReset(b);
      myTimer.end();
@@ -76,8 +78,10 @@
 
  void incrementSaver() {
    tickCounter++;
-   if (tickCounter >= myEyeSaver.ticksPerLed) {
-     if (!myEyeSaver.increment(b)) {
+   if (tickCounter >= EyeSaver::ticksPerLed) {
+     myEyeSaver.increment(b);
+     if (myEyeSaver.isAlarming) {
+       alarmTriggered = true;
        myTimer.end();
      }
      tickCounter = 0;
@@ -88,6 +92,7 @@
    b.begin();
    b.allLedsOff();
    Particle.function("pushButton", pushButton);
+   alarmTriggered = false;
  }
 
  void loop() {
@@ -105,6 +110,12 @@
      delay(250);
      b.allLedsOff();
      pushButton("");
+     delay(500);
+   }
+
+   if (alarmTriggered) {
+     Particle.publish("alarm-triggered", PRIVATE);
+     alarmTriggered = false;
      delay(500);
    }
  }
